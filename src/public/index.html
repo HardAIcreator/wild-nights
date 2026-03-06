@@ -1,0 +1,1251 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>WILD NIGHTS - ВЫЖИВАНИЕ В ЛЕСУ</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        body { 
+            margin: 0; 
+            overflow: hidden; 
+            background: #0a330a; 
+            font-family: 'Arial', sans-serif; 
+            color: white;
+        }
+        
+        #game {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+        
+        #ui { 
+            position: absolute; 
+            top: 10px; 
+            left: 10px; 
+            background: rgba(0,0,0,0.8); 
+            padding: 15px; 
+            border-radius: 15px; 
+            border: 3px solid #ff8800; 
+            z-index: 10;
+            min-width: 250px;
+            backdrop-filter: blur(5px);
+        }
+        
+        #day-info {
+            font-size: 20px;
+            color: #ffaa00;
+            margin-bottom: 10px;
+            text-shadow: 0 0 10px #ffaa00;
+        }
+        
+        .stat-row {
+            display: flex;
+            align-items: center;
+            margin: 5px 0;
+            gap: 10px;
+        }
+        
+        .stat-bar {
+            flex: 1;
+            height: 20px;
+            background: #333;
+            border: 2px solid #000;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        
+        .stat-fill {
+            height: 100%;
+            transition: width 0.2s;
+        }
+        
+        #hp-fill { background: linear-gradient(90deg, #f00, #ff0, #0f0); }
+        #hunger-fill { background: #ffaa00; }
+        #thirst-fill { background: #44aaff; }
+        
+        #monster-count {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.8);
+            padding: 10px 20px;
+            border-radius: 30px;
+            border: 3px solid #ff0000;
+            font-size: 24px;
+            color: #ff0000;
+            backdrop-filter: blur(5px);
+        }
+        
+        #inventory {
+            position: absolute;
+            bottom: 120px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 5px;
+            background: rgba(0,0,0,0.8);
+            padding: 10px;
+            border-radius: 20px;
+            border: 3px solid #ff8800;
+            z-index: 20;
+            backdrop-filter: blur(5px);
+        }
+        
+        .slot {
+            width: 70px;
+            height: 70px;
+            background: rgba(255,255,255,0.1);
+            border: 2px solid #ff8800;
+            border-radius: 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-size: 30px;
+            position: relative;
+            cursor: pointer;
+            transition: all 0.1s;
+        }
+        
+        .slot.selected {
+            border-color: #00ffff;
+            box-shadow: 0 0 20px #00ffff;
+            transform: scale(1.05);
+        }
+        
+        .slot-count {
+            position: absolute;
+            bottom: 2px;
+            right: 5px;
+            font-size: 14px;
+            background: #ff8800;
+            color: black;
+            padding: 2px 5px;
+            border-radius: 10px;
+            font-weight: bold;
+        }
+        
+        #craft-menu {
+            position: absolute;
+            bottom: 120px;
+            right: 10px;
+            background: rgba(0,0,0,0.9);
+            padding: 15px;
+            border-radius: 20px;
+            border: 3px solid #ffaa00;
+            width: 280px;
+            z-index: 20;
+            backdrop-filter: blur(5px);
+        }
+        
+        .craft-title {
+            color: #ffaa00;
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 20px;
+            font-weight: bold;
+        }
+        
+        .craft-item {
+            background: rgba(255,255,255,0.1);
+            padding: 8px;
+            margin: 5px 0;
+            border-radius: 10px;
+            border: 2px solid #ffaa00;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.1s;
+        }
+        
+        .craft-item:active {
+            background: rgba(255,170,0,0.3);
+            transform: scale(0.98);
+        }
+        
+        #campfire-status {
+            position: absolute;
+            top: 200px;
+            left: 10px;
+            background: rgba(0,0,0,0.8);
+            padding: 10px 20px;
+            border-radius: 20px;
+            border: 3px solid #ff6600;
+            color: #ffaa00;
+            font-size: 18px;
+            backdrop-filter: blur(5px);
+        }
+        
+        #controls { 
+            position: absolute; 
+            bottom: 10px; 
+            width: 100%; 
+            display: flex; 
+            justify-content: space-between; 
+            padding: 0 15px; 
+            z-index: 20; 
+            pointer-events: none;
+        }
+        
+        #controls > div {
+            pointer-events: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        .btn { 
+            width: 70px; 
+            height: 70px; 
+            background: rgba(68,68,68,0.8); 
+            border: 3px solid #ffff00; 
+            border-radius: 35px; 
+            color: white; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            font-size: 30px; 
+            box-shadow: 0 5px 0 #333; 
+            backdrop-filter: blur(5px);
+            transition: all 0.05s linear;
+        }
+        
+        .btn:active { 
+            transform: translateY(5px);
+            box-shadow: none;
+        }
+        
+        #gas-btn {
+            background: rgba(68,255,68,0.8);
+        }
+        
+        #back-btn {
+            background: rgba(255,170,68,0.8);
+        }
+        
+        #fire-btn {
+            background: rgba(255,0,0,0.8);
+        }
+        
+        #jump-btn {
+            background: rgba(68,68,255,0.8);
+        }
+        
+        #axe-btn {
+            background: rgba(139,69,19,0.8);
+        }
+        
+        #build-btn {
+            background: rgba(0,255,0,0.8);
+        }
+        
+        #camera-touch-area {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 5;
+        }
+        
+        #death-screen { 
+            position: absolute; 
+            top:0; 
+            left:0; 
+            width:100%; 
+            height:100%; 
+            display: none; 
+            flex-direction: column;
+            align-items: center; 
+            justify-content: center; 
+            z-index:200; 
+            background: rgba(0,0,0,0.95); 
+            color:white; 
+            font-size: 60px; 
+            backdrop-filter: blur(10px);
+        }
+        
+        #restart-btn {
+            padding: 15px 50px;
+            background: #00ff00;
+            border: 4px solid #ffff00;
+            border-radius: 40px;
+            font-size: 30px;
+            margin-top: 30px;
+            cursor: pointer;
+            color: black;
+            font-weight: bold;
+        }
+        
+        #crosshair {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 20px;
+            height: 20px;
+            border: 2px solid white;
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 15;
+        }
+        
+        #player-list {
+            position: absolute;
+            top: 10px;
+            left: 280px;
+            background: rgba(0,0,0,0.8);
+            padding: 10px;
+            border-radius: 15px;
+            border: 2px solid #44ff44;
+            min-width: 200px;
+            backdrop-filter: blur(5px);
+        }
+        
+        .player-entry {
+            padding: 3px;
+            margin: 2px 0;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .player-color {
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+        }
+    </style>
+</head>
+<body>
+    <div id="game">
+        <div id="camera-touch-area"></div>
+        <div id="crosshair"></div>
+        
+        <div id="ui">
+            <div id="day-info">🌲 ДЕНЬ 1 | 12:00</div>
+            <div class="stat-row">
+                <span>❤️</span>
+                <div class="stat-bar"><div id="hp-fill" class="stat-fill" style="width:100%"></div></div>
+                <span id="hp-text">100</span>
+            </div>
+            <div class="stat-row">
+                <span>🍖</span>
+                <div class="stat-bar"><div id="hunger-fill" class="stat-fill" style="width:100%"></div></div>
+                <span id="hunger-text">100</span>
+            </div>
+            <div class="stat-row">
+                <span>💧</span>
+                <div class="stat-bar"><div id="thirst-fill" class="stat-fill" style="width:100%"></div></div>
+                <span id="thirst-text">100</span>
+            </div>
+        </div>
+
+        <div id="monster-count">👹 0</div>
+        
+        <div id="campfire-status">🔥 КОСТЁР: 100%</div>
+
+        <div id="player-list">
+            <div style="color:#44ff44; margin-bottom:5px;">👥 В ЛЕСУ:</div>
+            <div id="players-list-content"></div>
+        </div>
+
+        <div id="inventory"></div>
+
+        <div id="craft-menu">
+            <div class="craft-title">🔨 КРАФТ</div>
+            <div class="craft-item" onclick="craftItem('axe')">🪓 ТОПОР (3 дерева)</div>
+            <div class="craft-item" onclick="craftItem('wall')">🧱 СТЕНА (5 дерева)</div>
+            <div class="craft-item" onclick="craftItem('campfire')">🔥 КОСТЁР (3 дерева)</div>
+            <div class="craft-item" onclick="craftItem('spear')">🔱 КОПЬЁ (2 дерева + 1 камень)</div>
+            <div class="craft-item" onclick="craftItem('bow')">🏹 ЛУК (3 дерева + 1 верёвка)</div>
+            <div class="craft-item" onclick="craftItem('medkit')">💊 АПТЕЧКА (2 травы + 1 ягода)</div>
+        </div>
+
+        <div id="controls">
+            <div>
+                <div class="btn" id="jump-btn" onclick="jump()">🦘</div>
+                <div class="btn" id="left-btn">←</div>
+                <div class="btn" id="right-btn">→</div>
+            </div>
+            <div>
+                <div style="display:flex; gap:5px;">
+                    <div class="btn" id="axe-btn" onclick="toggleAxe()">🪓</div>
+                    <div class="btn" id="build-btn" onclick="toggleBuild()">🏗️</div>
+                </div>
+                <div style="display:flex; gap:5px;">
+                    <div class="btn" id="gas-btn">↑</div>
+                    <div class="btn" id="back-btn">↓</div>
+                </div>
+                <div class="btn" id="fire-btn">⚔️</div>
+            </div>
+        </div>
+
+        <div id="death-screen">
+            <div>💀 ТЫ УМЕР 💀</div>
+            <div style="font-size:24px; margin:20px;">ДЕНЬ <span id="death-day">1</span></div>
+            <div id="restart-btn" onclick="restartGame()">⟲ ВОЗРОДИТЬСЯ</div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        // ====================== ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ======================
+        const socket = new WebSocket('wss://' + window.location.host);
+        
+        let scene, camera, renderer, player;
+        let players = new Map();
+        let monsters = new Map();
+        let buildings = new Map();
+        let resources = new Map();
+        
+        let playerId = null;
+        let playerColor = 0x44aaff;
+        
+        let hp = 100;
+        let maxHp = 100;
+        let hunger = 100;
+        let thirst = 100;
+        let level = 1;
+        let exp = 0;
+        
+        let dayCount = 1;
+        let dayTime = true;
+        let timeOfDay = 12;
+        
+        // Инвентарь
+        let inventory = new Array(10).fill(null).map(() => ({ item: null, count: 0 }));
+        let selectedSlot = 0;
+        let axeMode = false;
+        let buildMode = false;
+        let currentBuildType = 'wall';
+        
+        // Управление
+        let keys = { forward: 0, back: 0, left: 0, right: 0, jump: 0 };
+        let speed = 0;
+        let verticalSpeed = 0;
+        let onGround = true;
+        let cameraRot = 0;
+        
+        let isTouching = false;
+        let lastTouchX = 0;
+        
+        const GRAVITY = -0.02;
+        const JUMP_FORCE = 0.4;
+        
+        // Предметы
+        const itemsDB = {
+            'wood': { name: 'Древесина', emoji: '🪵', stack: 99 },
+            'stone': { name: 'Камень', emoji: '🪨', stack: 99 },
+            'berries': { name: 'Ягоды', emoji: '🫐', stack: 50, food: 15, water: 5 },
+            'meat': { name: 'Мясо', emoji: '🍖', stack: 30, food: 30, water: -5 },
+            'water': { name: 'Вода', emoji: '💧', stack: 20, water: 30 },
+            'herbs': { name: 'Трава', emoji: '🌿', stack: 50 },
+            'rope': { name: 'Верёвка', emoji: '🪢', stack: 30 },
+            'axe': { name: 'Топор', emoji: '🪓', stack: 1, damage: 20, type: 'tool' },
+            'spear': { name: 'Копьё', emoji: '🔱', stack: 1, damage: 35, type: 'weapon' },
+            'bow': { name: 'Лук', emoji: '🏹', stack: 1, damage: 40, type: 'weapon', range: true },
+            'wall': { name: 'Стена', emoji: '🧱', stack: 10 },
+            'campfire': { name: 'Костёр', emoji: '🔥', stack: 5 },
+            'medkit': { name: 'Аптечка', emoji: '💊', stack: 5, heal: 50 }
+        };
+        
+        // Рецепты
+        const recipes = {
+            'axe': { wood: 3 },
+            'wall': { wood: 5 },
+            'campfire': { wood: 3 },
+            'spear': { wood: 2, stone: 1 },
+            'bow': { wood: 3, rope: 1 },
+            'medkit': { herbs: 2, berries: 1 }
+        };
+
+        // ====================== ИНИЦИАЛИЗАЦИЯ ======================
+        function initGame() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x87CEEB);
+            scene.fog = new THREE.FogExp2(0x87CEEB, 0.002);
+            
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
+            document.getElementById('game').appendChild(renderer.domElement);
+            
+            // Освещение
+            const sunLight = new THREE.DirectionalLight(0xffffff, 1.2);
+            sunLight.position.set(50, 100, 50);
+            sunLight.castShadow = true;
+            scene.add(sunLight);
+            scene.add(new THREE.AmbientLight(0x404060));
+            
+            // Земля
+            const groundGeo = new THREE.PlaneGeometry(600, 600);
+            const groundMat = new THREE.MeshStandardMaterial({ color: 0x2a5a2a });
+            const ground = new THREE.Mesh(groundGeo, groundMat);
+            ground.rotation.x = -Math.PI/2;
+            ground.position.y = 0;
+            ground.receiveShadow = true;
+            scene.add(ground);
+            
+            // Игрок
+            player = createPlayer(playerColor, true);
+            player.position.set(0, 1, 5);
+            scene.add(player);
+            
+            initInventory();
+            setupSocket();
+            setupControls();
+            animate();
+        }
+
+        function createPlayer(color, isMain = false) {
+            const group = new THREE.Group();
+            
+            // Тело
+            const bodyGeo = new THREE.BoxGeometry(0.8, 1.6, 0.4);
+            const bodyMat = new THREE.MeshStandardMaterial({ color });
+            const body = new THREE.Mesh(bodyGeo, bodyMat);
+            body.position.y = 0.8;
+            body.castShadow = true;
+            body.receiveShadow = true;
+            group.add(body);
+            
+            // Голова
+            const headGeo = new THREE.BoxGeometry(0.8, 0.8, 0.8);
+            const headMat = new THREE.MeshStandardMaterial({ color: 0xffcc99 });
+            const head = new THREE.Mesh(headGeo, headMat);
+            head.position.y = 1.6;
+            head.castShadow = true;
+            head.receiveShadow = true;
+            group.add(head);
+            
+            // Глаза
+            const eyeGeo = new THREE.BoxGeometry(0.15, 0.15, 0.1);
+            const eyeMat = new THREE.MeshStandardMaterial({ color: 0x000000 });
+            
+            const leftEye = new THREE.Mesh(eyeGeo, eyeMat);
+            leftEye.position.set(-0.2, 1.75, 0.4);
+            group.add(leftEye);
+            
+            const rightEye = new THREE.Mesh(eyeGeo, eyeMat);
+            rightEye.position.set(0.2, 1.75, 0.4);
+            group.add(rightEye);
+            
+            // Рюкзак для главного игрока
+            if (isMain) {
+                const backpackGeo = new THREE.BoxGeometry(0.6, 0.4, 0.3);
+                const backpackMat = new THREE.MeshStandardMaterial({ color: 0x8B4513 });
+                const backpack = new THREE.Mesh(backpackGeo, backpackMat);
+                backpack.position.set(0, 0.8, -0.3);
+                backpack.castShadow = true;
+                group.add(backpack);
+            }
+            
+            return group;
+        }
+
+        function createTree(x, z, variant) {
+            const group = new THREE.Group();
+            
+            // Ствол
+            const trunkGeo = new THREE.CylinderGeometry(0.5, 0.7, 3, 8);
+            const trunkMat = new THREE.MeshStandardMaterial({ color: 0x8B4513 });
+            const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+            trunk.position.y = 1.5;
+            trunk.castShadow = true;
+            trunk.receiveShadow = true;
+            group.add(trunk);
+            
+            // Крона
+            const leafColors = [0x2a5a2a, 0x3a6a3a, 0x1a4a1a];
+            const leafColor = leafColors[variant % 3];
+            
+            for (let i = 0; i < 5; i++) {
+                const leafGeo = new THREE.ConeGeometry(0.8, 1, 8);
+                const leafMat = new THREE.MeshStandardMaterial({ color: leafColor });
+                const leaf = new THREE.Mesh(leafGeo, leafMat);
+                leaf.position.y = 2.5 + i * 0.5;
+                leaf.position.x = Math.sin(i) * 0.3;
+                leaf.position.z = Math.cos(i) * 0.3;
+                leaf.castShadow = true;
+                leaf.receiveShadow = true;
+                group.add(leaf);
+            }
+            
+            group.position.set(x, 0, z);
+            return group;
+        }
+
+        function createBerryBush(x, z) {
+            const group = new THREE.Group();
+            
+            const bushGeo = new THREE.SphereGeometry(0.8, 6);
+            const bushMat = new THREE.MeshStandardMaterial({ color: 0x2a7a2a });
+            const bush = new THREE.Mesh(bushGeo, bushMat);
+            bush.position.y = 0.4;
+            bush.castShadow = true;
+            bush.receiveShadow = true;
+            group.add(bush);
+            
+            // Ягодки
+            for (let i = 0; i < 5; i++) {
+                const berryGeo = new THREE.SphereGeometry(0.1, 4);
+                const berryMat = new THREE.MeshStandardMaterial({ color: 0xff44aa });
+                const berry = new THREE.Mesh(berryGeo, berryMat);
+                berry.position.set(
+                    Math.sin(i) * 0.4,
+                    0.6 + Math.cos(i*2) * 0.2,
+                    Math.cos(i) * 0.4
+                );
+                group.add(berry);
+            }
+            
+            group.position.set(x, 0, z);
+            return group;
+        }
+
+        function createMonster(type, x, z) {
+            const group = new THREE.Group();
+            
+            const colors = {
+                wolf: 0x666666,
+                bear: 0x8B4513,
+                spirit: 0x88aaff
+            };
+            
+            const color = colors[type] || 0xff00ff;
+            
+            if (type === 'wolf') {
+                // Тело
+                const bodyGeo = new THREE.BoxGeometry(0.8, 0.6, 1.5);
+                const bodyMat = new THREE.MeshStandardMaterial({ color });
+                const body = new THREE.Mesh(bodyGeo, bodyMat);
+                body.position.y = 0.3;
+                body.castShadow = true;
+                body.receiveShadow = true;
+                group.add(body);
+                
+                // Голова
+                const headGeo = new THREE.BoxGeometry(0.6, 0.5, 0.6);
+                const headMat = new THREE.MeshStandardMaterial({ color });
+                const head = new THREE.Mesh(headGeo, headMat);
+                head.position.set(0, 0.5, 0.8);
+                head.castShadow = true;
+                group.add(head);
+                
+                // Уши
+                const earGeo = new THREE.ConeGeometry(0.2, 0.3, 4);
+                const earMat = new THREE.MeshStandardMaterial({ color });
+                
+                const leftEar = new THREE.Mesh(earGeo, earMat);
+                leftEar.position.set(-0.2, 0.8, 0.8);
+                group.add(leftEar);
+                
+                const rightEar = new THREE.Mesh(earGeo, earMat);
+                rightEar.position.set(0.2, 0.8, 0.8);
+                group.add(rightEar);
+            } else if (type === 'bear') {
+                const bodyGeo = new THREE.BoxGeometry(1.2, 1, 1.8);
+                const bodyMat = new THREE.MeshStandardMaterial({ color });
+                const body = new THREE.Mesh(bodyGeo, bodyMat);
+                body.position.y = 0.5;
+                body.castShadow = true;
+                group.add(body);
+            } else {
+                const bodyGeo = new THREE.ConeGeometry(0.8, 2, 8);
+                const bodyMat = new THREE.MeshStandardMaterial({ color, transparent: true, opacity: 0.7 });
+                const body = new THREE.Mesh(bodyGeo, bodyMat);
+                body.position.y = 1;
+                body.castShadow = true;
+                group.add(body);
+            }
+            
+            // Полоска здоровья
+            const healthBarBg = new THREE.Mesh(
+                new THREE.BoxGeometry(1, 0.1, 0.1),
+                new THREE.MeshBasicMaterial({ color: 0x333333 })
+            );
+            healthBarBg.position.y = 2;
+            group.add(healthBarBg);
+            
+            const healthBar = new THREE.Mesh(
+                new THREE.BoxGeometry(1, 0.1, 0.1),
+                new THREE.MeshBasicMaterial({ color: 0xff0000 })
+            );
+            healthBar.position.y = 2;
+            group.add(healthBar);
+            group.userData.healthBar = healthBar;
+            
+            group.position.set(x, 0, z);
+            return group;
+        }
+
+        function createBuilding(type, x, z) {
+            const group = new THREE.Group();
+            
+            if (type === 'wall') {
+                const wallGeo = new THREE.BoxGeometry(2, 2, 0.5);
+                const wallMat = new THREE.MeshStandardMaterial({ color: 0x8B4513 });
+                const wall = new THREE.Mesh(wallGeo, wallMat);
+                wall.position.y = 1;
+                wall.castShadow = true;
+                wall.receiveShadow = true;
+                group.add(wall);
+            } else if (type === 'campfire') {
+                const baseGeo = new THREE.CylinderGeometry(0.8, 0.8, 0.2, 8);
+                const baseMat = new THREE.MeshStandardMaterial({ color: 0x654321 });
+                const base = new THREE.Mesh(baseGeo, baseMat);
+                base.position.y = 0.1;
+                group.add(base);
+                
+                // Дрова
+                for (let i = 0; i < 3; i++) {
+                    const logGeo = new THREE.BoxGeometry(0.8, 0.2, 0.2);
+                    const logMat = new THREE.MeshStandardMaterial({ color: 0x8B4513 });
+                    const log = new THREE.Mesh(logGeo, logMat);
+                    log.position.y = 0.3;
+                    log.rotation.y = i * Math.PI/3;
+                    group.add(log);
+                }
+                
+                // Огонь
+                const fireGeo = new THREE.ConeGeometry(0.4, 0.6, 8);
+                const fireMat = new THREE.MeshStandardMaterial({ color: 0xff5500, emissive: 0x442200 });
+                const fire = new THREE.Mesh(fireGeo, fireMat);
+                fire.position.y = 0.8;
+                group.add(fire);
+            }
+            
+            group.position.set(x, 0, z);
+            return group;
+        }
+
+        // ====================== ИНВЕНТАРЬ ======================
+        function initInventory() {
+            const container = document.getElementById('inventory');
+            container.innerHTML = '';
+            
+            for (let i = 0; i < 10; i++) {
+                const slot = document.createElement('div');
+                slot.className = 'slot' + (i === selectedSlot ? ' selected' : '');
+                
+                if (inventory[i].item) {
+                    const item = itemsDB[inventory[i].item];
+                    slot.innerHTML = `
+                        <span>${item.emoji}</span>
+                        <span class="slot-count">${inventory[i].count}</span>
+                    `;
+                } else {
+                    slot.innerHTML = '<span>⬜</span>';
+                }
+                
+                slot.onclick = () => selectSlot(i);
+                container.appendChild(slot);
+            }
+        }
+
+        function selectSlot(index) {
+            selectedSlot = index;
+            initInventory();
+        }
+
+        function addToInventory(item, count = 1) {
+            for (let i = 0; i < 10; i++) {
+                if (inventory[i].item === item && inventory[i].count < (itemsDB[item]?.stack || 1)) {
+                    inventory[i].count += count;
+                    initInventory();
+                    return true;
+                }
+            }
+            
+            for (let i = 0; i < 10; i++) {
+                if (inventory[i].item === null) {
+                    inventory[i].item = item;
+                    inventory[i].count = count;
+                    initInventory();
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        function removeFromInventory(item, count = 1) {
+            for (let i = 0; i < 10; i++) {
+                if (inventory[i].item === item) {
+                    inventory[i].count -= count;
+                    if (inventory[i].count <= 0) {
+                        inventory[i].item = null;
+                        inventory[i].count = 0;
+                    }
+                    initInventory();
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        // ====================== КРАФТ ======================
+        window.craftItem = function(recipeName) {
+            const recipe = recipes[recipeName];
+            if (!recipe) return;
+            
+            // Проверяем ресурсы
+            for (let [res, need] of Object.entries(recipe)) {
+                let total = 0;
+                for (let i = 0; i < 10; i++) {
+                    if (inventory[i].item === res) total += inventory[i].count;
+                }
+                if (total < need) return;
+            }
+            
+            // Забираем ресурсы
+            for (let [res, need] of Object.entries(recipe)) {
+                removeFromInventory(res, need);
+            }
+            
+            // Добавляем результат
+            addToInventory(recipeName, 1);
+        };
+
+        window.toggleAxe = function() {
+            axeMode = !axeMode;
+            buildMode = false;
+            document.getElementById('axe-btn').style.background = axeMode ? 'rgba(255,165,0,0.8)' : 'rgba(139,69,19,0.8)';
+        };
+
+        window.toggleBuild = function() {
+            buildMode = !buildMode;
+            axeMode = false;
+            document.getElementById('build-btn').style.background = buildMode ? 'rgba(255,165,0,0.8)' : 'rgba(0,255,0,0.8)';
+        };
+
+        // ====================== МУЛЬТИПЛЕЕР ======================
+        function setupSocket() {
+            socket.onopen = () => {
+                console.log('Подключено к серверу');
+            };
+            
+            socket.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                
+                switch(data.type) {
+                    case 'init':
+                        playerId = data.id;
+                        playerColor = data.color;
+                        
+                        data.monsters.forEach(m => {
+                            const monster = createMonster(m.type, m.x, m.z);
+                            monster.userData = { id: m.id, health: m.health, maxHealth: m.maxHealth };
+                            scene.add(monster);
+                            monsters.set(m.id, monster);
+                        });
+                        
+                        data.buildings.forEach(b => {
+                            const building = createBuilding(b.type, b.x, b.z);
+                            building.userData = { id: b.id, type: b.type, health: b.health };
+                            scene.add(building);
+                            buildings.set(b.id, building);
+                        });
+                        
+                        data.resources.forEach(r => {
+                            if (r.type === 'tree') {
+                                const tree = createTree(r.x, r.z, r.variant || 0);
+                                tree.userData = { id: r.id, type: 'tree', health: r.health };
+                                scene.add(tree);
+                                resources.set(r.id, tree);
+                            } else if (r.type === 'berry_bush') {
+                                const bush = createBerryBush(r.x, r.z);
+                                bush.userData = { id: r.id, type: 'berry', health: r.health };
+                                scene.add(bush);
+                                resources.set(r.id, bush);
+                            }
+                        });
+                        
+                        updateMonsterCount();
+                        break;
+                        
+                    case 'player_join':
+                        if (data.id !== playerId && !players.has(data.id)) {
+                            const newPlayer = createPlayer(data.color, false);
+                            newPlayer.position.set(data.x, 1, data.z);
+                            newPlayer.rotation.y = data.rot;
+                            scene.add(newPlayer);
+                            players.set(data.id, newPlayer);
+                            updatePlayersList();
+                        }
+                        break;
+                        
+                    case 'player_move':
+                        if (players.has(data.id)) {
+                            const p = players.get(data.id);
+                            p.position.x = data.x;
+                            p.position.z = data.z;
+                            p.rotation.y = data.rot;
+                        }
+                        break;
+                        
+                    case 'player_left':
+                        if (players.has(data.id)) {
+                            scene.remove(players.get(data.id));
+                            players.delete(data.id);
+                            updatePlayersList();
+                        }
+                        break;
+                        
+                    case 'player_hit':
+                        if (data.id === playerId) {
+                            hp = data.hp;
+                            updateUI();
+                            if (hp <= 0) {
+                                document.getElementById('death-screen').style.display = 'flex';
+                                document.getElementById('death-day').textContent = dayCount;
+                            }
+                        }
+                        break;
+                        
+                    case 'player_respawn':
+                        if (data.id === playerId) {
+                            player.position.set(data.x, 1, data.z);
+                        } else if (players.has(data.id)) {
+                            players.get(data.id).position.set(data.x, 1, data.z);
+                        }
+                        break;
+                        
+                    case 'monster_spawn':
+                        const monster = createMonster(data.type, data.x, data.z);
+                        monster.userData = { id: data.id, health: data.health, maxHealth: data.health };
+                        scene.add(monster);
+                        monsters.set(data.id, monster);
+                        updateMonsterCount();
+                        break;
+                        
+                    case 'monster_move':
+                        if (monsters.has(data.id)) {
+                            monsters.get(data.id).position.set(data.x, 1, data.z);
+                        }
+                        break;
+                        
+                    case 'monster_hit':
+                        if (monsters.has(data.id)) {
+                            const m = monsters.get(data.id);
+                            m.userData.health = data.health;
+                            if (m.userData.healthBar) {
+                                m.userData.healthBar.scale.x = data.health / m.userData.maxHealth;
+                            }
+                        }
+                        break;
+                        
+                    case 'monster_death':
+                        if (monsters.has(data.id)) {
+                            scene.remove(monsters.get(data.id));
+                            monsters.delete(data.id);
+                            updateMonsterCount();
+                        }
+                        break;
+                        
+                    case 'build':
+                        const building = createBuilding(data.buildingType, data.x, data.z);
+                        building.userData = { id: data.id, type: data.buildingType, health: 100 };
+                        scene.add(building);
+                        buildings.set(data.id, building);
+                        break;
+                        
+                    case 'building_hit':
+                        if (buildings.has(data.id) && data.id === 'campfire') {
+                            const b = buildings.get(data.id);
+                            if (b.userData.type === 'campfire') {
+                                document.getElementById('campfire-status').innerHTML = `🔥 КОСТЁР: ${Math.floor(data.health)}%`;
+                            }
+                        }
+                        break;
+                        
+                    case 'resource_destroy':
+                        if (resources.has(data.id)) {
+                            scene.remove(resources.get(data.id));
+                            resources.delete(data.id);
+                        }
+                        break;
+                        
+                    case 'add_item':
+                        addToInventory(data.itemType, data.count);
+                        break;
+                        
+                    case 'time_update':
+                        timeOfDay = data.timeOfDay;
+                        dayCount = data.dayCount;
+                        dayTime = data.dayTime;
+                        
+                        const hours = Math.floor(timeOfDay);
+                        const mins = Math.floor((timeOfDay % 1) * 60);
+                        const timeStr = `${hours.toString().padStart(2,'0')}:${mins.toString().padStart(2,'0')}`;
+                        document.getElementById('day-info').innerHTML = 
+                            (dayTime ? '🌲' : '🌙') + ` ДЕНЬ ${dayCount} | ${timeStr}`;
+                        
+                        if (scene) {
+                            scene.background.setHex(dayTime ? 0x87CEEB : 0x111122);
+                            scene.fog.color.setHex(dayTime ? 0x87CEEB : 0x111122);
+                        }
+                        break;
+                        
+                    case 'chat':
+                        addChatMessage(data.name, data.message);
+                        break;
+                }
+            };
+        }
+
+        function updatePlayersList() {
+            const container = document.getElementById('players-list-content');
+            let html = `<div class="player-entry">
+                <div class="player-color" style="background:#${playerColor.toString(16).padStart(6,'0')}"></div>
+                <span>Вы (${Math.floor(hp)}❤️)</span>
+            </div>`;
+            
+            players.forEach((player, id) => {
+                const color = player.children[0].material.color.getHex();
+                html += `<div class="player-entry">
+                    <div class="player-color" style="background:#${color.toString(16).padStart(6,'0')}"></div>
+                    <span>Выживший</span>
+                </div>`;
+            });
+            
+            container.innerHTML = html;
+        }
+
+        function updateMonsterCount() {
+            document.getElementById('monster-count').innerHTML = '👹 ' + monsters.size;
+        }
+
+        function updateUI() {
+            document.getElementById('hp-fill').style.width = (hp / maxHp * 100) + '%';
+            document.getElementById('hp-text').textContent = Math.floor(hp);
+            document.getElementById('hunger-fill').style.width = hunger + '%';
+            document.getElementById('hunger-text').textContent = Math.floor(hunger);
+            document.getElementById('thirst-fill').style.width = thirst + '%';
+            document.getElementById('thirst-text').textContent = Math.floor(thirst);
+        }
+
+        // ====================== ДЕЙСТВИЯ ======================
+        window.attack = function() {
+            if (!player) return;
+            
+            if (axeMode) {
+                // Рубка дерева
+                let hitResource = false;
+                resources.forEach((res, id) => {
+                    if (!hitResource && res.userData.type === 'tree') {
+                        const dist = player.position.distanceTo(res.position);
+                        if (dist < 4) {
+                            hitResource = true;
+                            socket.send(JSON.stringify({
+                                type: 'damage_resource',
+                                id,
+                                damage: 25
+                            }));
+                        }
+                    }
+                });
+            } else if (buildMode) {
+                // Строительство
+                const x = Math.round((player.position.x + Math.sin(player.rotation.y) * 3) / 2) * 2;
+                const z = Math.round((player.position.z + Math.cos(player.rotation.y) * 3) / 2) * 2;
+                
+                socket.send(JSON.stringify({
+                    type: 'build',
+                    buildingType: 'wall',
+                    x,
+                    z
+                }));
+                buildMode = false;
+                document.getElementById('build-btn').style.background = 'rgba(0,255,0,0.8)';
+            } else {
+                // Атака монстров
+                const weapon = inventory[selectedSlot].item;
+                let damage = 10; // кулаки
+                
+                if (weapon && itemsDB[weapon] && itemsDB[weapon].damage) {
+                    damage = itemsDB[weapon].damage;
+                }
+                
+                monsters.forEach((monster, id) => {
+                    const dist = player.position.distanceTo(monster.position);
+                    if (dist < 4) {
+                        socket.send(JSON.stringify({
+                            type: 'monster_hit',
+                            id,
+                            damage
+                        }));
+                    }
+                });
+            }
+        };
+
+        window.jump = function() {
+            if (onGround) {
+                verticalSpeed = JUMP_FORCE;
+                onGround = false;
+            }
+        };
+
+        // ====================== ФИЗИКА ======================
+        function checkCollisions(newX, newZ) {
+            // Границы карты
+            if (Math.abs(newX) > 250 || Math.abs(newZ) > 250) return true;
+            
+            // Коллизии со стенами
+            for (let building of buildings.values()) {
+                if (building.userData.type === 'wall') {
+                    const dx = Math.abs(newX - building.position.x);
+                    const dz = Math.abs(newZ - building.position.z);
+                    if (dx < 1.5 && dz < 1.5) return true;
+                }
+            }
+            
+            // Коллизии с деревьями
+            for (let res of resources.values()) {
+                if (res.userData.type === 'tree') {
+                    const dx = Math.abs(newX - res.position.x);
+                    const dz = Math.abs(newZ - res.position.z);
+                    if (dx < 1.2 && dz < 1.2) return true;
+                }
+            }
+            
+            return false;
+        }
+
+        // ====================== УПРАВЛЕНИЕ ======================
+        function setupControls() {
+            document.getElementById('left-btn').ontouchstart = (e) => { e.preventDefault(); keys.left = 1; };
+            document.getElementById('left-btn').ontouchend = () => keys.left = 0;
+            
+            document.getElementById('right-btn').ontouchstart = (e) => { e.preventDefault(); keys.right = 1; };
+            document.getElementById('right-btn').ontouchend = () => keys.right = 0;
+            
+            document.getElementById('gas-btn').ontouchstart = (e) => { e.preventDefault(); keys.forward = 1; };
+            document.getElementById('gas-btn').ontouchend = () => keys.forward = 0;
+            
+            document.getElementById('back-btn').ontouchstart = (e) => { e.preventDefault(); keys.back = 1; };
+            document.getElementById('back-btn').ontouchend = () => keys.back = 0;
+            
+            const touchArea = document.getElementById('camera-touch-area');
+            
+            touchArea.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                isTouching = true;
+                lastTouchX = e.touches[0].clientX;
+            });
+            
+            touchArea.addEventListener('touchmove', (e) => {
+                e.preventDefault();
+                if (!isTouching) return;
+                
+                const deltaX = (e.touches[0].clientX - lastTouchX) * 0.01;
+                player.rotation.y += deltaX;
+                
+                lastTouchX = e.touches[0].clientX;
+            });
+            
+            touchArea.addEventListener('touchend', () => {
+                isTouching = false;
+            });
+        }
+
+        // ====================== АНИМАЦИЯ ======================
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            if (!player) return;
+            
+            // Обновление голода и жажды
+            hunger -= 0.0005;
+            thirst -= 0.0008;
+            
+            if (hunger <= 0 || thirst <= 0) {
+                hp -= 0.02;
+                hunger = Math.max(0, hunger);
+                thirst = Math.max(0, thirst);
+            }
+            
+            updateUI();
+            
+            // Поворот
+            if (keys.left) player.rotation.y += 0.03;
+            if (keys.right) player.rotation.y -= 0.03;
+            
+            // Движение
+            let moveSpeed = 0;
+            if (keys.forward) moveSpeed = 0.1;
+            else if (keys.back) moveSpeed = -0.05;
+            
+            // Гравитация
+            verticalSpeed += GRAVITY;
+            player.position.y += verticalSpeed;
+            
+            if (player.position.y <= 1) {
+                player.position.y = 1;
+                verticalSpeed = 0;
+                onGround = true;
+            }
+            
+            // Перемещение с проверкой коллизий
+            const newX = player.position.x + Math.sin(player.rotation.y) * moveSpeed;
+            const newZ = player.position.z + Math.cos(player.rotation.y) * moveSpeed;
+            
+            if (!checkCollisions(newX, newZ)) {
+                player.position.x = newX;
+                player.position.z = newZ;
+            }
+            
+            // Отправка позиции на сервер
+            if (socket.readyState === WebSocket.OPEN && playerId) {
+                socket.send(JSON.stringify({
+                    type: 'move',
+                    x: player.position.x,
+                    z: player.position.z,
+                    rot: player.rotation.y
+                }));
+                
+                socket.send(JSON.stringify({
+                    type: 'update_stats',
+                    hp,
+                    hunger,
+                    thirst
+                }));
+            }
+            
+            // Камера
+            const camDist = 8;
+            const camHeight = 4;
+            
+            camera.position.x = player.position.x - Math.sin(player.rotation.y) * camDist;
+            camera.position.y = player.position.y + camHeight;
+            camera.position.z = player.position.z - Math.cos(player.rotation.y) * camDist;
+            camera.lookAt(player.position.x, player.position.y + 1, player.position.z);
+            
+            renderer.render(scene, camera);
+        }
+
+        window.restartGame = function() {
+            document.getElementById('death-screen').style.display = 'none';
+            hp = maxHp;
+            hunger = 100;
+            thirst = 100;
+            player.position.set(0, 1, 5);
+            updateUI();
+        };
+
+        window.onload = initGame;
+    </script>
+</body>
+  </html>
