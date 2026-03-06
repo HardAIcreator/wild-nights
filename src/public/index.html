@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -147,6 +148,8 @@
             width: 280px;
             z-index: 20;
             backdrop-filter: blur(5px);
+            max-height: 300px;
+            overflow-y: auto;
         }
         
         .craft-title {
@@ -325,6 +328,57 @@
             height: 15px;
             border-radius: 50%;
         }
+        
+        #chat-container {
+            position: absolute;
+            bottom: 250px;
+            left: 10px;
+            width: 300px;
+            background: rgba(0,0,0,0.9);
+            border: 3px solid #ff44ff;
+            border-radius: 15px;
+            padding: 10px;
+            z-index: 30;
+            backdrop-filter: blur(5px);
+            display: none;
+        }
+        
+        #chat-messages {
+            height: 150px;
+            overflow-y: auto;
+            margin-bottom: 10px;
+            padding: 5px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 10px;
+        }
+        
+        .chat-message {
+            margin: 5px 0;
+            padding: 3px;
+            border-bottom: 1px solid #444;
+        }
+        
+        #chat-input {
+            width: 100%;
+            padding: 8px;
+            border-radius: 10px;
+            border: 2px solid #ff44ff;
+            background: #222;
+            color: white;
+        }
+        
+        #hint {
+            position: absolute;
+            bottom: 200px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.8);
+            padding: 10px 20px;
+            border-radius: 20px;
+            border: 2px solid #ffaa00;
+            z-index: 30;
+            white-space: nowrap;
+        }
     </style>
 </head>
 <body>
@@ -364,13 +418,19 @@
 
         <div id="craft-menu">
             <div class="craft-title">🔨 КРАФТ</div>
-            <div class="craft-item" onclick="craftItem('axe')">🪓 ТОПОР (3 дерева)</div>
-            <div class="craft-item" onclick="craftItem('wall')">🧱 СТЕНА (5 дерева)</div>
-            <div class="craft-item" onclick="craftItem('campfire')">🔥 КОСТЁР (3 дерева)</div>
-            <div class="craft-item" onclick="craftItem('spear')">🔱 КОПЬЁ (2 дерева + 1 камень)</div>
-            <div class="craft-item" onclick="craftItem('bow')">🏹 ЛУК (3 дерева + 1 верёвка)</div>
-            <div class="craft-item" onclick="craftItem('medkit')">💊 АПТЕЧКА (2 травы + 1 ягода)</div>
+            <div class="craft-item" onclick="craftItem('axe')">🪓 ТОПОР (2 дер + 1 кам)</div>
+            <div class="craft-item" onclick="craftItem('wall')">🧱 СТЕНА (5 дер)</div>
+            <div class="craft-item" onclick="craftItem('campfire')">🔥 КОСТЁР (3 дер)</div>
+            <div class="craft-item" onclick="craftItem('spear')">🔱 КОПЬЁ (2 дер + 1 кам)</div>
+            <div class="craft-item" onclick="craftItem('medkit')">💊 АПТЕЧКА (2 яг + 1 трава)</div>
         </div>
+
+        <div id="chat-container">
+            <div id="chat-messages"></div>
+            <input id="chat-input" placeholder="Введите сообщение..." maxlength="50">
+        </div>
+
+        <div id="hint">🪓 Собери 2 дерева и 1 камень, чтобы скрафтить топор!</div>
 
         <div id="controls">
             <div>
@@ -382,6 +442,7 @@
                 <div style="display:flex; gap:5px;">
                     <div class="btn" id="axe-btn" onclick="toggleAxe()">🪓</div>
                     <div class="btn" id="build-btn" onclick="toggleBuild()">🏗️</div>
+                    <div class="btn" id="chat-btn" onclick="toggleChat()">💬</div>
                 </div>
                 <div style="display:flex; gap:5px;">
                     <div class="btn" id="gas-btn">↑</div>
@@ -411,31 +472,26 @@
         
         let playerId = null;
         let playerColor = 0x44aaff;
+        let playerName = 'Выживший_' + Math.floor(Math.random() * 1000);
         
         let hp = 100;
         let maxHp = 100;
         let hunger = 100;
         let thirst = 100;
-        let level = 1;
-        let exp = 0;
         
         let dayCount = 1;
         let dayTime = true;
         let timeOfDay = 12;
         
-        // Инвентарь
         let inventory = new Array(10).fill(null).map(() => ({ item: null, count: 0 }));
         let selectedSlot = 0;
         let axeMode = false;
         let buildMode = false;
-        let currentBuildType = 'wall';
         
-        // Управление
         let keys = { forward: 0, back: 0, left: 0, right: 0, jump: 0 };
         let speed = 0;
         let verticalSpeed = 0;
         let onGround = true;
-        let cameraRot = 0;
         
         let isTouching = false;
         let lastTouchX = 0;
@@ -443,31 +499,25 @@
         const GRAVITY = -0.02;
         const JUMP_FORCE = 0.4;
         
-        // Предметы
         const itemsDB = {
             'wood': { name: 'Древесина', emoji: '🪵', stack: 99 },
             'stone': { name: 'Камень', emoji: '🪨', stack: 99 },
-            'berries': { name: 'Ягоды', emoji: '🫐', stack: 50, food: 15, water: 5 },
-            'meat': { name: 'Мясо', emoji: '🍖', stack: 30, food: 30, water: -5 },
-            'water': { name: 'Вода', emoji: '💧', stack: 20, water: 30 },
+            'berries': { name: 'Ягоды', emoji: '🫐', stack: 50, food: 15 },
+            'meat': { name: 'Мясо', emoji: '🍖', stack: 30, food: 30 },
             'herbs': { name: 'Трава', emoji: '🌿', stack: 50 },
-            'rope': { name: 'Верёвка', emoji: '🪢', stack: 30 },
-            'axe': { name: 'Топор', emoji: '🪓', stack: 1, damage: 20, type: 'tool' },
-            'spear': { name: 'Копьё', emoji: '🔱', stack: 1, damage: 35, type: 'weapon' },
-            'bow': { name: 'Лук', emoji: '🏹', stack: 1, damage: 40, type: 'weapon', range: true },
+            'axe': { name: 'Топор', emoji: '🪓', stack: 1, damage: 25 },
+            'spear': { name: 'Копьё', emoji: '🔱', stack: 1, damage: 35 },
             'wall': { name: 'Стена', emoji: '🧱', stack: 10 },
             'campfire': { name: 'Костёр', emoji: '🔥', stack: 5 },
             'medkit': { name: 'Аптечка', emoji: '💊', stack: 5, heal: 50 }
         };
         
-        // Рецепты
         const recipes = {
-            'axe': { wood: 3 },
+            'axe': { wood: 2, stone: 1 },
             'wall': { wood: 5 },
             'campfire': { wood: 3 },
             'spear': { wood: 2, stone: 1 },
-            'bow': { wood: 3, rope: 1 },
-            'medkit': { herbs: 2, berries: 1 }
+            'medkit': { berries: 2, herbs: 1 }
         };
 
         // ====================== ИНИЦИАЛИЗАЦИЯ ======================
@@ -486,19 +536,52 @@
             const sunLight = new THREE.DirectionalLight(0xffffff, 1.2);
             sunLight.position.set(50, 100, 50);
             sunLight.castShadow = true;
+            sunLight.shadow.mapSize.width = 1024;
+            sunLight.shadow.mapSize.height = 1024;
             scene.add(sunLight);
             scene.add(new THREE.AmbientLight(0x404060));
             
-            // Земля
+            // Земля с текстурой
             const groundGeo = new THREE.PlaneGeometry(600, 600);
-            const groundMat = new THREE.MeshStandardMaterial({ color: 0x2a5a2a });
+            const canvas = document.createElement('canvas');
+            canvas.width = 512;
+            canvas.height = 512;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#2a5a2a';
+            ctx.fillRect(0, 0, 512, 512);
+            for(let i = 0; i < 1000; i++) {
+                ctx.fillStyle = ['#3a6a3a', '#1a4a1a', '#4a7a4a'][Math.floor(Math.random() * 3)];
+                ctx.fillRect(Math.random() * 512, Math.random() * 512, 4, 4);
+            }
+            const groundTexture = new THREE.CanvasTexture(canvas);
+            groundTexture.wrapS = THREE.RepeatWrapping;
+            groundTexture.wrapT = THREE.RepeatWrapping;
+            groundTexture.repeat.set(10, 10);
+            
+            const groundMat = new THREE.MeshStandardMaterial({ 
+                map: groundTexture,
+                roughness: 0.8
+            });
             const ground = new THREE.Mesh(groundGeo, groundMat);
             ground.rotation.x = -Math.PI/2;
             ground.position.y = 0;
             ground.receiveShadow = true;
             scene.add(ground);
             
-            // Игрок
+            // Стартовый инвентарь
+            inventory = [
+                { item: 'stone', count: 3 },
+                { item: 'wood', count: 2 },
+                { item: null, count: 0 },
+                { item: null, count: 0 },
+                { item: null, count: 0 },
+                { item: null, count: 0 },
+                { item: null, count: 0 },
+                { item: null, count: 0 },
+                { item: null, count: 0 },
+                { item: null, count: 0 }
+            ];
+            
             player = createPlayer(playerColor, true);
             player.position.set(0, 1, 5);
             scene.add(player);
@@ -506,15 +589,32 @@
             initInventory();
             setupSocket();
             setupControls();
+            
+            // Убираем подсказку через 10 секунд
+            setTimeout(() => {
+                document.getElementById('hint').style.display = 'none';
+            }, 10000);
+            
             animate();
         }
 
         function createPlayer(color, isMain = false) {
             const group = new THREE.Group();
             
-            // Тело
+            // Текстура тела
+            const canvas = document.createElement('canvas');
+            canvas.width = 64;
+            canvas.height = 64;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#' + color.toString(16).padStart(6, '0');
+            ctx.fillRect(0, 0, 64, 64);
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(10, 10, 44, 44);
+            const bodyTexture = new THREE.CanvasTexture(canvas);
+            
             const bodyGeo = new THREE.BoxGeometry(0.8, 1.6, 0.4);
-            const bodyMat = new THREE.MeshStandardMaterial({ color });
+            const bodyMat = new THREE.MeshStandardMaterial({ map: bodyTexture });
             const body = new THREE.Mesh(bodyGeo, bodyMat);
             body.position.y = 0.8;
             body.castShadow = true;
@@ -522,35 +622,26 @@
             group.add(body);
             
             // Голова
+            const headCanvas = document.createElement('canvas');
+            headCanvas.width = 64;
+            headCanvas.height = 64;
+            const hCtx = headCanvas.getContext('2d');
+            hCtx.fillStyle = '#ffcc99';
+            hCtx.fillRect(0, 0, 64, 64);
+            hCtx.fillStyle = '#000000';
+            hCtx.fillRect(15, 20, 10, 10);
+            hCtx.fillRect(39, 20, 10, 10);
+            hCtx.fillStyle = '#884422';
+            hCtx.fillRect(20, 40, 24, 5);
+            const headTexture = new THREE.CanvasTexture(headCanvas);
+            
             const headGeo = new THREE.BoxGeometry(0.8, 0.8, 0.8);
-            const headMat = new THREE.MeshStandardMaterial({ color: 0xffcc99 });
+            const headMat = new THREE.MeshStandardMaterial({ map: headTexture });
             const head = new THREE.Mesh(headGeo, headMat);
             head.position.y = 1.6;
             head.castShadow = true;
             head.receiveShadow = true;
             group.add(head);
-            
-            // Глаза
-            const eyeGeo = new THREE.BoxGeometry(0.15, 0.15, 0.1);
-            const eyeMat = new THREE.MeshStandardMaterial({ color: 0x000000 });
-            
-            const leftEye = new THREE.Mesh(eyeGeo, eyeMat);
-            leftEye.position.set(-0.2, 1.75, 0.4);
-            group.add(leftEye);
-            
-            const rightEye = new THREE.Mesh(eyeGeo, eyeMat);
-            rightEye.position.set(0.2, 1.75, 0.4);
-            group.add(rightEye);
-            
-            // Рюкзак для главного игрока
-            if (isMain) {
-                const backpackGeo = new THREE.BoxGeometry(0.6, 0.4, 0.3);
-                const backpackMat = new THREE.MeshStandardMaterial({ color: 0x8B4513 });
-                const backpack = new THREE.Mesh(backpackGeo, backpackMat);
-                backpack.position.set(0, 0.8, -0.3);
-                backpack.castShadow = true;
-                group.add(backpack);
-            }
             
             return group;
         }
@@ -558,9 +649,25 @@
         function createTree(x, z, variant) {
             const group = new THREE.Group();
             
-            // Ствол
+            // Ствол с текстурой коры
+            const canvas = document.createElement('canvas');
+            canvas.width = 64;
+            canvas.height = 64;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#8B4513';
+            ctx.fillRect(0, 0, 64, 64);
+            ctx.strokeStyle = '#5a2e0e';
+            ctx.lineWidth = 2;
+            for(let i = 0; i < 8; i++) {
+                ctx.beginPath();
+                ctx.moveTo(i * 8, 0);
+                ctx.lineTo(i * 8 + 15, 64);
+                ctx.stroke();
+            }
+            const trunkTexture = new THREE.CanvasTexture(canvas);
+            
             const trunkGeo = new THREE.CylinderGeometry(0.5, 0.7, 3, 8);
-            const trunkMat = new THREE.MeshStandardMaterial({ color: 0x8B4513 });
+            const trunkMat = new THREE.MeshStandardMaterial({ map: trunkTexture });
             const trunk = new THREE.Mesh(trunkGeo, trunkMat);
             trunk.position.y = 1.5;
             trunk.castShadow = true;
@@ -568,20 +675,62 @@
             group.add(trunk);
             
             // Крона
-            const leafColors = [0x2a5a2a, 0x3a6a3a, 0x1a4a1a];
-            const leafColor = leafColors[variant % 3];
+            const leafCanvas = document.createElement('canvas');
+            leafCanvas.width = 64;
+            leafCanvas.height = 64;
+            const lCtx = leafCanvas.getContext('2d');
+            const gradient = lCtx.createRadialGradient(32, 32, 0, 32, 32, 32);
+            gradient.addColorStop(0, '#3a8a3a');
+            gradient.addColorStop(1, '#1a4a1a');
+            lCtx.fillStyle = gradient;
+            lCtx.fillRect(0, 0, 64, 64);
+            const leafTexture = new THREE.CanvasTexture(leafCanvas);
             
-            for (let i = 0; i < 5; i++) {
-                const leafGeo = new THREE.ConeGeometry(0.8, 1, 8);
-                const leafMat = new THREE.MeshStandardMaterial({ color: leafColor });
+            for (let i = 0; i < 4; i++) {
+                const leafGeo = new THREE.ConeGeometry(0.8, 1.2, 8);
+                const leafMat = new THREE.MeshStandardMaterial({ map: leafTexture });
                 const leaf = new THREE.Mesh(leafGeo, leafMat);
                 leaf.position.y = 2.5 + i * 0.5;
-                leaf.position.x = Math.sin(i) * 0.3;
-                leaf.position.z = Math.cos(i) * 0.3;
+                leaf.position.x = Math.sin(i * 1.5) * 0.2;
+                leaf.position.z = Math.cos(i * 1.5) * 0.2;
                 leaf.castShadow = true;
                 leaf.receiveShadow = true;
                 group.add(leaf);
             }
+            
+            group.position.set(x, 0, z);
+            group.rotation.y = Math.random() * Math.PI * 2;
+            return group;
+        }
+
+        function createStone(x, z, variant) {
+            const group = new THREE.Group();
+            
+            const canvas = document.createElement('canvas');
+            canvas.width = 64;
+            canvas.height = 64;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#888888';
+            ctx.fillRect(0, 0, 64, 64);
+            for(let j = 0; j < 30; j++) {
+                const gray = 80 + Math.random() * 40;
+                ctx.fillStyle = `rgb(${gray}, ${gray}, ${gray})`;
+                ctx.fillRect(Math.random() * 64, Math.random() * 64, 4 + Math.random() * 8, 4 + Math.random() * 8);
+            }
+            const stoneTexture = new THREE.CanvasTexture(canvas);
+            
+            let stoneGeo;
+            if (variant === 0) stoneGeo = new THREE.DodecahedronGeometry(0.5);
+            else if (variant === 1) stoneGeo = new THREE.OctahedronGeometry(0.4);
+            else stoneGeo = new THREE.TorusKnotGeometry(0.3, 0.1, 32, 8);
+            
+            const stoneMat = new THREE.MeshStandardMaterial({ map: stoneTexture, roughness: 0.8 });
+            const stone = new THREE.Mesh(stoneGeo, stoneMat);
+            stone.position.y = 0.3;
+            stone.castShadow = true;
+            stone.receiveShadow = true;
+            stone.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
+            group.add(stone);
             
             group.position.set(x, 0, z);
             return group;
@@ -590,24 +739,19 @@
         function createBerryBush(x, z) {
             const group = new THREE.Group();
             
-            const bushGeo = new THREE.SphereGeometry(0.8, 6);
+            const bushGeo = new THREE.SphereGeometry(0.6, 6);
             const bushMat = new THREE.MeshStandardMaterial({ color: 0x2a7a2a });
             const bush = new THREE.Mesh(bushGeo, bushMat);
-            bush.position.y = 0.4;
+            bush.position.y = 0.3;
             bush.castShadow = true;
             bush.receiveShadow = true;
             group.add(bush);
             
-            // Ягодки
             for (let i = 0; i < 5; i++) {
                 const berryGeo = new THREE.SphereGeometry(0.1, 4);
                 const berryMat = new THREE.MeshStandardMaterial({ color: 0xff44aa });
                 const berry = new THREE.Mesh(berryGeo, berryMat);
-                berry.position.set(
-                    Math.sin(i) * 0.4,
-                    0.6 + Math.cos(i*2) * 0.2,
-                    Math.cos(i) * 0.4
-                );
+                berry.position.set(Math.sin(i) * 0.4, 0.6, Math.cos(i) * 0.4);
                 group.add(berry);
             }
             
@@ -618,53 +762,37 @@
         function createMonster(type, x, z) {
             const group = new THREE.Group();
             
-            const colors = {
-                wolf: 0x666666,
-                bear: 0x8B4513,
-                spirit: 0x88aaff
-            };
-            
+            const colors = { wolf: 0x666666, bear: 0x8B4513, spirit: 0x88aaff };
             const color = colors[type] || 0xff00ff;
             
+            const canvas = document.createElement('canvas');
+            canvas.width = 64;
+            canvas.height = 64;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#' + color.toString(16).padStart(6, '0');
+            ctx.fillRect(0, 0, 64, 64);
+            ctx.fillStyle = '#ff0000';
+            ctx.fillRect(15, 15, 10, 10);
+            ctx.fillRect(39, 15, 10, 10);
+            const texture = new THREE.CanvasTexture(canvas);
+            
             if (type === 'wolf') {
-                // Тело
                 const bodyGeo = new THREE.BoxGeometry(0.8, 0.6, 1.5);
-                const bodyMat = new THREE.MeshStandardMaterial({ color });
+                const bodyMat = new THREE.MeshStandardMaterial({ map: texture });
                 const body = new THREE.Mesh(bodyGeo, bodyMat);
                 body.position.y = 0.3;
                 body.castShadow = true;
-                body.receiveShadow = true;
                 group.add(body);
-                
-                // Голова
-                const headGeo = new THREE.BoxGeometry(0.6, 0.5, 0.6);
-                const headMat = new THREE.MeshStandardMaterial({ color });
-                const head = new THREE.Mesh(headGeo, headMat);
-                head.position.set(0, 0.5, 0.8);
-                head.castShadow = true;
-                group.add(head);
-                
-                // Уши
-                const earGeo = new THREE.ConeGeometry(0.2, 0.3, 4);
-                const earMat = new THREE.MeshStandardMaterial({ color });
-                
-                const leftEar = new THREE.Mesh(earGeo, earMat);
-                leftEar.position.set(-0.2, 0.8, 0.8);
-                group.add(leftEar);
-                
-                const rightEar = new THREE.Mesh(earGeo, earMat);
-                rightEar.position.set(0.2, 0.8, 0.8);
-                group.add(rightEar);
             } else if (type === 'bear') {
                 const bodyGeo = new THREE.BoxGeometry(1.2, 1, 1.8);
-                const bodyMat = new THREE.MeshStandardMaterial({ color });
+                const bodyMat = new THREE.MeshStandardMaterial({ map: texture });
                 const body = new THREE.Mesh(bodyGeo, bodyMat);
                 body.position.y = 0.5;
                 body.castShadow = true;
                 group.add(body);
             } else {
                 const bodyGeo = new THREE.ConeGeometry(0.8, 2, 8);
-                const bodyMat = new THREE.MeshStandardMaterial({ color, transparent: true, opacity: 0.7 });
+                const bodyMat = new THREE.MeshStandardMaterial({ map: texture, transparent: true, opacity: 0.7 });
                 const body = new THREE.Mesh(bodyGeo, bodyMat);
                 body.position.y = 1;
                 body.castShadow = true;
@@ -672,17 +800,11 @@
             }
             
             // Полоска здоровья
-            const healthBarBg = new THREE.Mesh(
-                new THREE.BoxGeometry(1, 0.1, 0.1),
-                new THREE.MeshBasicMaterial({ color: 0x333333 })
-            );
+            const healthBarBg = new THREE.Mesh(new THREE.BoxGeometry(1, 0.1, 0.1), new THREE.MeshBasicMaterial({ color: 0x333333 }));
             healthBarBg.position.y = 2;
             group.add(healthBarBg);
             
-            const healthBar = new THREE.Mesh(
-                new THREE.BoxGeometry(1, 0.1, 0.1),
-                new THREE.MeshBasicMaterial({ color: 0xff0000 })
-            );
+            const healthBar = new THREE.Mesh(new THREE.BoxGeometry(1, 0.1, 0.1), new THREE.MeshBasicMaterial({ color: 0xff0000 }));
             healthBar.position.y = 2;
             group.add(healthBar);
             group.userData.healthBar = healthBar;
@@ -709,7 +831,6 @@
                 base.position.y = 0.1;
                 group.add(base);
                 
-                // Дрова
                 for (let i = 0; i < 3; i++) {
                     const logGeo = new THREE.BoxGeometry(0.8, 0.2, 0.2);
                     const logMat = new THREE.MeshStandardMaterial({ color: 0x8B4513 });
@@ -719,7 +840,6 @@
                     group.add(log);
                 }
                 
-                // Огонь
                 const fireGeo = new THREE.ConeGeometry(0.4, 0.6, 8);
                 const fireMat = new THREE.MeshStandardMaterial({ color: 0xff5500, emissive: 0x442200 });
                 const fire = new THREE.Mesh(fireGeo, fireMat);
@@ -742,10 +862,7 @@
                 
                 if (inventory[i].item) {
                     const item = itemsDB[inventory[i].item];
-                    slot.innerHTML = `
-                        <span>${item.emoji}</span>
-                        <span class="slot-count">${inventory[i].count}</span>
-                    `;
+                    slot.innerHTML = `<span>${item.emoji}</span><span class="slot-count">${inventory[i].count}</span>`;
                 } else {
                     slot.innerHTML = '<span>⬜</span>';
                 }
@@ -768,7 +885,6 @@
                     return true;
                 }
             }
-            
             for (let i = 0; i < 10; i++) {
                 if (inventory[i].item === null) {
                     inventory[i].item = item;
@@ -800,7 +916,6 @@
             const recipe = recipes[recipeName];
             if (!recipe) return;
             
-            // Проверяем ресурсы
             for (let [res, need] of Object.entries(recipe)) {
                 let total = 0;
                 for (let i = 0; i < 10; i++) {
@@ -809,12 +924,10 @@
                 if (total < need) return;
             }
             
-            // Забираем ресурсы
             for (let [res, need] of Object.entries(recipe)) {
                 removeFromInventory(res, need);
             }
             
-            // Добавляем результат
             addToInventory(recipeName, 1);
         };
 
@@ -830,10 +943,16 @@
             document.getElementById('build-btn').style.background = buildMode ? 'rgba(255,165,0,0.8)' : 'rgba(0,255,0,0.8)';
         };
 
+        window.toggleChat = function() {
+            const chat = document.getElementById('chat-container');
+            chat.style.display = chat.style.display === 'none' ? 'block' : 'none';
+        };
+
         // ====================== МУЛЬТИПЛЕЕР ======================
         function setupSocket() {
             socket.onopen = () => {
-                console.log('Подключено к серверу');
+                console.log('✅ Подключено к серверу');
+                socket.send(JSON.stringify({ type: 'join', name: playerName }));
             };
             
             socket.onmessage = (event) => {
@@ -844,26 +963,41 @@
                         playerId = data.id;
                         playerColor = data.color;
                         
-                        data.monsters.forEach(m => {
+                        data.players?.forEach(p => {
+                            if (p.id !== playerId) {
+                                const newPlayer = createPlayer(p.color, false);
+                                newPlayer.position.set(p.x, 1, p.z);
+                                newPlayer.rotation.y = p.rot || 0;
+                                scene.add(newPlayer);
+                                players.set(p.id, newPlayer);
+                            }
+                        });
+                        
+                        data.monsters?.forEach(m => {
                             const monster = createMonster(m.type, m.x, m.z);
                             monster.userData = { id: m.id, health: m.health, maxHealth: m.maxHealth };
                             scene.add(monster);
                             monsters.set(m.id, monster);
                         });
                         
-                        data.buildings.forEach(b => {
+                        data.buildings?.forEach(b => {
                             const building = createBuilding(b.type, b.x, b.z);
                             building.userData = { id: b.id, type: b.type, health: b.health };
                             scene.add(building);
                             buildings.set(b.id, building);
                         });
                         
-                        data.resources.forEach(r => {
+                        data.resources?.forEach(r => {
                             if (r.type === 'tree') {
                                 const tree = createTree(r.x, r.z, r.variant || 0);
                                 tree.userData = { id: r.id, type: 'tree', health: r.health };
                                 scene.add(tree);
                                 resources.set(r.id, tree);
+                            } else if (r.type === 'stone') {
+                                const stone = createStone(r.x, r.z, r.variant || 0);
+                                stone.userData = { id: r.id, type: 'stone', health: r.health };
+                                scene.add(stone);
+                                resources.set(r.id, stone);
                             } else if (r.type === 'berry_bush') {
                                 const bush = createBerryBush(r.x, r.z);
                                 bush.userData = { id: r.id, type: 'berry', health: r.health };
@@ -873,13 +1007,14 @@
                         });
                         
                         updateMonsterCount();
+                        updatePlayersList();
                         break;
                         
                     case 'player_join':
                         if (data.id !== playerId && !players.has(data.id)) {
                             const newPlayer = createPlayer(data.color, false);
-                            newPlayer.position.set(data.x, 1, data.z);
-                            newPlayer.rotation.y = data.rot;
+                            newPlayer.position.set(data.x || 0, 1, data.z || 5);
+                            newPlayer.rotation.y = data.rot || 0;
                             scene.add(newPlayer);
                             players.set(data.id, newPlayer);
                             updatePlayersList();
@@ -961,15 +1096,6 @@
                         buildings.set(data.id, building);
                         break;
                         
-                    case 'building_hit':
-                        if (buildings.has(data.id) && data.id === 'campfire') {
-                            const b = buildings.get(data.id);
-                            if (b.userData.type === 'campfire') {
-                                document.getElementById('campfire-status').innerHTML = `🔥 КОСТЁР: ${Math.floor(data.health)}%`;
-                            }
-                        }
-                        break;
-                        
                     case 'resource_destroy':
                         if (resources.has(data.id)) {
                             scene.remove(resources.get(data.id));
@@ -988,14 +1114,11 @@
                         
                         const hours = Math.floor(timeOfDay);
                         const mins = Math.floor((timeOfDay % 1) * 60);
-                        const timeStr = `${hours.toString().padStart(2,'0')}:${mins.toString().padStart(2,'0')}`;
                         document.getElementById('day-info').innerHTML = 
-                            (dayTime ? '🌲' : '🌙') + ` ДЕНЬ ${dayCount} | ${timeStr}`;
+                            (dayTime ? '🌲' : '🌙') + ` ДЕНЬ ${dayCount} | ${hours}:${mins.toString().padStart(2,'0')}`;
                         
-                        if (scene) {
-                            scene.background.setHex(dayTime ? 0x87CEEB : 0x111122);
-                            scene.fog.color.setHex(dayTime ? 0x87CEEB : 0x111122);
-                        }
+                        scene.background.setHex(dayTime ? 0x87CEEB : 0x111122);
+                        scene.fog.color.setHex(dayTime ? 0x87CEEB : 0x111122);
                         break;
                         
                     case 'chat':
@@ -1005,19 +1128,22 @@
             };
         }
 
+        function addChatMessage(name, msg) {
+            const container = document.getElementById('chat-messages');
+            const div = document.createElement('div');
+            div.className = 'chat-message';
+            div.innerHTML = `<b>${name}:</b> ${msg}`;
+            container.appendChild(div);
+            container.scrollTop = container.scrollHeight;
+        }
+
         function updatePlayersList() {
             const container = document.getElementById('players-list-content');
-            let html = `<div class="player-entry">
-                <div class="player-color" style="background:#${playerColor.toString(16).padStart(6,'0')}"></div>
-                <span>Вы (${Math.floor(hp)}❤️)</span>
-            </div>`;
+            let html = `<div class="player-entry"><div class="player-color" style="background:#${playerColor.toString(16).padStart(6,'0')}"></div><span>Вы (${Math.floor(hp)}❤️)</span></div>`;
             
             players.forEach((player, id) => {
                 const color = player.children[0].material.color.getHex();
-                html += `<div class="player-entry">
-                    <div class="player-color" style="background:#${color.toString(16).padStart(6,'0')}"></div>
-                    <span>Выживший</span>
-                </div>`;
+                html += `<div class="player-entry"><div class="player-color" style="background:#${color.toString(16).padStart(6,'0')}"></div><span>Выживший</span></div>`;
             });
             
             container.innerHTML = html;
@@ -1041,23 +1167,29 @@
             if (!player) return;
             
             if (axeMode) {
-                // Рубка дерева
-                let hitResource = false;
+                let hasAxe = false;
+                for (let i = 0; i < 10; i++) {
+                    if (inventory[i].item === 'axe') {
+                        hasAxe = true;
+                        break;
+                    }
+                }
+                
+                let damage = hasAxe ? 25 : 5;
+                
                 resources.forEach((res, id) => {
-                    if (!hitResource && res.userData.type === 'tree') {
+                    if (res.userData.type === 'tree' || res.userData.type === 'stone' || res.userData.type === 'berry') {
                         const dist = player.position.distanceTo(res.position);
                         if (dist < 4) {
-                            hitResource = true;
                             socket.send(JSON.stringify({
                                 type: 'damage_resource',
                                 id,
-                                damage: 25
+                                damage
                             }));
                         }
                     }
                 });
             } else if (buildMode) {
-                // Строительство
                 const x = Math.round((player.position.x + Math.sin(player.rotation.y) * 3) / 2) * 2;
                 const z = Math.round((player.position.z + Math.cos(player.rotation.y) * 3) / 2) * 2;
                 
@@ -1070,12 +1202,18 @@
                 buildMode = false;
                 document.getElementById('build-btn').style.background = 'rgba(0,255,0,0.8)';
             } else {
-                // Атака монстров
                 const weapon = inventory[selectedSlot].item;
-                let damage = 10; // кулаки
+                let damage = 10;
                 
                 if (weapon && itemsDB[weapon] && itemsDB[weapon].damage) {
                     damage = itemsDB[weapon].damage;
+                    
+                    if (weapon === 'medkit') {
+                        hp = Math.min(maxHp, hp + 50);
+                        removeFromInventory('medkit', 1);
+                        updateUI();
+                        return;
+                    }
                 }
                 
                 monsters.forEach((monster, id) => {
@@ -1100,10 +1238,8 @@
 
         // ====================== ФИЗИКА ======================
         function checkCollisions(newX, newZ) {
-            // Границы карты
             if (Math.abs(newX) > 250 || Math.abs(newZ) > 250) return true;
             
-            // Коллизии со стенами
             for (let building of buildings.values()) {
                 if (building.userData.type === 'wall') {
                     const dx = Math.abs(newX - building.position.x);
@@ -1112,7 +1248,6 @@
                 }
             }
             
-            // Коллизии с деревьями
             for (let res of resources.values()) {
                 if (res.userData.type === 'tree') {
                     const dx = Math.abs(newX - res.position.x);
@@ -1128,36 +1263,36 @@
         function setupControls() {
             document.getElementById('left-btn').ontouchstart = (e) => { e.preventDefault(); keys.left = 1; };
             document.getElementById('left-btn').ontouchend = () => keys.left = 0;
-            
             document.getElementById('right-btn').ontouchstart = (e) => { e.preventDefault(); keys.right = 1; };
             document.getElementById('right-btn').ontouchend = () => keys.right = 0;
-            
             document.getElementById('gas-btn').ontouchstart = (e) => { e.preventDefault(); keys.forward = 1; };
             document.getElementById('gas-btn').ontouchend = () => keys.forward = 0;
-            
             document.getElementById('back-btn').ontouchstart = (e) => { e.preventDefault(); keys.back = 1; };
             document.getElementById('back-btn').ontouchend = () => keys.back = 0;
             
             const touchArea = document.getElementById('camera-touch-area');
-            
             touchArea.addEventListener('touchstart', (e) => {
                 e.preventDefault();
                 isTouching = true;
                 lastTouchX = e.touches[0].clientX;
             });
-            
             touchArea.addEventListener('touchmove', (e) => {
                 e.preventDefault();
                 if (!isTouching) return;
-                
                 const deltaX = (e.touches[0].clientX - lastTouchX) * 0.01;
                 player.rotation.y += deltaX;
-                
                 lastTouchX = e.touches[0].clientX;
             });
+            touchArea.addEventListener('touchend', () => isTouching = false);
             
-            touchArea.addEventListener('touchend', () => {
-                isTouching = false;
+            document.getElementById('chat-input').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    const msg = e.target.value.trim();
+                    if (msg) {
+                        socket.send(JSON.stringify({ type: 'chat', message: msg }));
+                        e.target.value = '';
+                    }
+                }
             });
         }
 
@@ -1167,28 +1302,24 @@
             
             if (!player) return;
             
-            // Обновление голода и жажды
-            hunger -= 0.0005;
-            thirst -= 0.0008;
+            hunger -= 0.0003;
+            thirst -= 0.0005;
             
             if (hunger <= 0 || thirst <= 0) {
-                hp -= 0.02;
+                hp -= 0.01;
                 hunger = Math.max(0, hunger);
                 thirst = Math.max(0, thirst);
             }
             
             updateUI();
             
-            // Поворот
             if (keys.left) player.rotation.y += 0.03;
             if (keys.right) player.rotation.y -= 0.03;
             
-            // Движение
             let moveSpeed = 0;
             if (keys.forward) moveSpeed = 0.1;
             else if (keys.back) moveSpeed = -0.05;
             
-            // Гравитация
             verticalSpeed += GRAVITY;
             player.position.y += verticalSpeed;
             
@@ -1198,7 +1329,6 @@
                 onGround = true;
             }
             
-            // Перемещение с проверкой коллизий
             const newX = player.position.x + Math.sin(player.rotation.y) * moveSpeed;
             const newZ = player.position.z + Math.cos(player.rotation.y) * moveSpeed;
             
@@ -1207,7 +1337,6 @@
                 player.position.z = newZ;
             }
             
-            // Отправка позиции на сервер
             if (socket.readyState === WebSocket.OPEN && playerId) {
                 socket.send(JSON.stringify({
                     type: 'move',
@@ -1215,7 +1344,6 @@
                     z: player.position.z,
                     rot: player.rotation.y
                 }));
-                
                 socket.send(JSON.stringify({
                     type: 'update_stats',
                     hp,
@@ -1224,10 +1352,8 @@
                 }));
             }
             
-            // Камера
             const camDist = 8;
             const camHeight = 4;
-            
             camera.position.x = player.position.x - Math.sin(player.rotation.y) * camDist;
             camera.position.y = player.position.y + camHeight;
             camera.position.z = player.position.z - Math.cos(player.rotation.y) * camDist;
@@ -1248,4 +1374,4 @@
         window.onload = initGame;
     </script>
 </body>
-  </html>
+    </html>
