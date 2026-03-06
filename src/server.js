@@ -16,20 +16,20 @@ app.get('*', (req, res) => {
 // Игровое состояние
 const players = new Map();
 const monsters = new Map();
-const buildings = new Map(); // стены, ловушки, костры
-const resources = new Map(); // деревья, ягоды
+const buildings = new Map();
+const resources = new Map();
 
 let nextMonsterId = 0;
 let nextBuildingId = 0;
 let dayCount = 1;
 let dayTime = true;
-let timeOfDay = 12; // 12:00 день
+let timeOfDay = 12;
 
-// Генерация леса (деревья, кусты)
+// Генерация деревьев
 for (let i = 0; i < 150; i++) {
     const x = (Math.random() - 0.5) * 300;
     const z = (Math.random() - 0.5) * 300;
-    if (Math.abs(x) < 20 && Math.abs(z) < 20) continue; // Не спавним рядом с базой
+    if (Math.abs(x) < 20 && Math.abs(z) < 20) continue;
     
     resources.set('tree_' + i, {
         type: 'tree',
@@ -40,6 +40,22 @@ for (let i = 0; i < 150; i++) {
     });
 }
 
+// Генерация камней
+for (let i = 0; i < 80; i++) {
+    const x = (Math.random() - 0.5) * 300;
+    const z = (Math.random() - 0.5) * 300;
+    if (Math.abs(x) < 20 && Math.abs(z) < 20) continue;
+    
+    resources.set('stone_' + i, {
+        type: 'stone',
+        x, z,
+        health: 50,
+        resource: 'stone',
+        variant: Math.floor(Math.random() * 3)
+    });
+}
+
+// Генерация ягод
 for (let i = 0; i < 80; i++) {
     const x = (Math.random() - 0.5) * 300;
     const z = (Math.random() - 0.5) * 300;
@@ -65,22 +81,9 @@ setInterval(() => {
     const wasDay = dayTime;
     dayTime = timeOfDay >= 6 && timeOfDay < 20;
     
-    // Если наступила ночь - спавним монстров
     if (wasDay && !dayTime) {
         spawnMonsters();
     }
-    
-    // Регенерация ягод (каждые 5 минут)
-    resources.forEach((res, id) => {
-        if (res.type === 'berry_bush' && res.health <= 0) {
-            if (!res.regenTime) res.regenTime = Date.now() + 300000;
-            if (Date.now() > res.regenTime) {
-                res.health = 30;
-                res.regenTime = 0;
-                broadcast({ type: 'resource_respawn', id });
-            }
-        }
-    });
     
     broadcast({
         type: 'time_update',
@@ -91,7 +94,7 @@ setInterval(() => {
 }, 1000);
 
 function spawnMonsters() {
-    const count = 8 + dayCount * 2; // С каждым днём монстров больше
+    const count = 8 + dayCount * 2;
     
     for (let i = 0; i < count; i++) {
         const angle = Math.random() * Math.PI * 2;
@@ -99,7 +102,6 @@ function spawnMonsters() {
         const x = Math.cos(angle) * dist;
         const z = Math.sin(angle) * dist;
         
-        // Не спавним слишком близко к базе
         if (Math.abs(x) < 15 && Math.abs(z) < 15) continue;
         
         const r = Math.random();
@@ -150,14 +152,12 @@ function spawnMonsters() {
 
 // Движение монстров
 setInterval(() => {
-    if (players.size === 0 || dayTime) return; // Днём не двигаются
+    if (players.size === 0 || dayTime) return;
     
     monsters.forEach((monster, id) => {
-        // Ищем ближайший костёр или игрока
         let target = null;
         let targetDist = 1000;
         
-        // Сначала ищем костры (монстры хотят их потушить)
         buildings.forEach((building, bid) => {
             if (building.type === 'campfire' && building.health > 0) {
                 const dist = Math.sqrt(
@@ -171,7 +171,6 @@ setInterval(() => {
             }
         });
         
-        // Если нет костров рядом, ищем игроков
         if (!target) {
             players.forEach((player, pid) => {
                 const dist = Math.sqrt(
@@ -186,7 +185,6 @@ setInterval(() => {
         }
         
         if (target) {
-            // Движение к цели
             const dx = target.x - monster.x;
             const dz = target.z - monster.z;
             const dist = Math.sqrt(dx*dx + dz*dz);
@@ -195,7 +193,6 @@ setInterval(() => {
                 monster.x += (dx / dist) * monster.speed;
                 monster.z += (dz / dist) * monster.speed;
             } else {
-                // Атака
                 const now = Date.now();
                 if (now - monster.lastAttack > 1500) {
                     if (target.type === 'player') {
@@ -212,7 +209,6 @@ setInterval(() => {
                                     type: 'player_death',
                                     id: target.id
                                 });
-                                // Возврат в точку возрождения
                                 player.x = 0;
                                 player.z = 5;
                                 player.hp = player.maxHp;
@@ -262,6 +258,8 @@ wss.on('connection', (ws) => {
     const playerId = 'p' + Math.random().toString(36).substring(7);
     const playerColor = Math.floor(Math.random() * 0xffffff);
     
+    console.log('✅ Игрок подключился:', playerId);
+    
     players.set(playerId, {
         ws,
         name: 'Выживший_' + Math.floor(Math.random() * 1000),
@@ -275,11 +273,10 @@ wss.on('connection', (ws) => {
         thirst: 100,
         exp: 0,
         level: 1,
-        inventory: [],
         lastSeen: Date.now()
     });
     
-    // Отправляем новому игроку состояние мира
+    // Отправляем новому игроку его ID и список всех игроков
     ws.send(JSON.stringify({
         type: 'init',
         id: playerId,
@@ -287,12 +284,21 @@ wss.on('connection', (ws) => {
         timeOfDay,
         dayCount,
         dayTime,
+        players: Array.from(players.entries()).map(([id, p]) => ({
+            id,
+            name: p.name,
+            color: p.color,
+            x: p.x,
+            z: p.z,
+            rot: p.rot,
+            hp: p.hp
+        })),
         monsters: Array.from(monsters.entries()).map(([id, m]) => ({ id, ...m })),
         buildings: Array.from(buildings.entries()).map(([id, b]) => ({ id, ...b })),
         resources: Array.from(resources.entries()).map(([id, r]) => ({ id, ...r }))
     }));
     
-    // Сообщаем всем о новом игроке
+    // Сообщаем ВСЕМ остальным игрокам о новом игроке
     broadcast({
         type: 'player_join',
         id: playerId,
@@ -318,6 +324,7 @@ wss.on('connection', (ws) => {
                     player.z = msg.z;
                     player.rot = msg.rot;
                     
+                    // Отправляем ВСЕМ движение
                     broadcast({
                         type: 'player_move',
                         id: playerId,
@@ -328,7 +335,6 @@ wss.on('connection', (ws) => {
                     break;
                     
                 case 'build':
-                    // Проверяем, можно ли поставить
                     let canBuild = true;
                     buildings.forEach(b => {
                         const dx = b.x - msg.x;
@@ -367,16 +373,18 @@ wss.on('connection', (ws) => {
                             res.health -= msg.damage;
                             
                             if (res.health <= 0) {
+                                resources.delete(msg.id);
                                 broadcast({
                                     type: 'resource_destroy',
                                     id: msg.id
                                 });
                                 
-                                // Добавляем ресурс игроку
+                                // Даём ресурс игроку
                                 ws.send(JSON.stringify({
                                     type: 'add_item',
                                     itemType: res.resource,
-                                    count: res.type === 'tree' ? 3 : 1
+                                    count: res.type === 'tree' ? 3 : 
+                                           res.type === 'stone' ? 2 : 1
                                 }));
                             } else {
                                 broadcast({
@@ -403,19 +411,6 @@ wss.on('connection', (ws) => {
                                 z: monster.z
                             });
                             
-                            // Опыт и выпадение ресурсов
-                            player.exp += monster.exp;
-                            if (player.exp >= player.level * 100) {
-                                player.level++;
-                                player.maxHp += 20;
-                                player.hp = player.maxHp;
-                                broadcast({
-                                    type: 'player_level_up',
-                                    id: playerId,
-                                    level: player.level
-                                });
-                            }
-                            
                             // Шанс выпадения мяса
                             if (Math.random() < 0.6) {
                                 ws.send(JSON.stringify({
@@ -434,14 +429,6 @@ wss.on('connection', (ws) => {
                     }
                     break;
                     
-                case 'add_item':
-                    ws.send(JSON.stringify({
-                        type: 'add_item',
-                        itemType: msg.itemType,
-                        count: msg.count
-                    }));
-                    break;
-                    
                 case 'update_stats':
                     player.hp = msg.hp;
                     player.hunger = msg.hunger;
@@ -456,6 +443,14 @@ wss.on('connection', (ws) => {
                         color: player.color
                     });
                     break;
+                    
+                case 'add_item':
+                    ws.send(JSON.stringify({
+                        type: 'add_item',
+                        itemType: msg.itemType,
+                        count: msg.count
+                    }));
+                    break;
             }
         } catch(e) {
             console.log('Ошибка:', e);
@@ -463,17 +458,21 @@ wss.on('connection', (ws) => {
     });
     
     ws.on('close', () => {
+        console.log('❌ Игрок отключился:', playerId);
         players.delete(playerId);
         broadcast({ type: 'player_left', id: playerId });
     });
 });
 
 function broadcast(message, exclude = null) {
+    let sent = 0;
     wss.clients.forEach(client => {
         if (client !== exclude && client.readyState === WebSocket.OPEN) {
             client.send(JSON.stringify(message));
+            sent++;
         }
     });
+    console.log(`📢 Рассылка ${message.type}: ${sent} клиентам`);
 }
 
 const PORT = process.env.PORT || 10000;
